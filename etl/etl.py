@@ -7,7 +7,7 @@ class ETL:
     Class ETL to handle the ETL of the data.
 
     This class really only does the extract and transform functions of ETL. The data is then received downstream by the
-        classifier algorithms for processing.
+        algorithms for processing.
     """
     def __init__(self, data_name, random_state=1):
         """
@@ -16,11 +16,12 @@ class ETL:
         All data comes from the data folder. The init function calls to both extract and transform for processing
 
         :param data_name: str, name of the data file passed at the command line. Below are the valid names:
-            breast-cancer
             glass
-            iris
-            soybean
+            segmentation
             vote
+            abalone
+            machine (assignment name: computer hardware)
+            forest-fires
         :param random_state: int, seed for data split
         """
         # Set the attributes to hold our data
@@ -30,19 +31,18 @@ class ETL:
 
         # Meta attributes
         self.data_name = data_name
-        self.original_data_name = data_name
         self.random_state = random_state
         self.classes = 0
-
-        # Naive Bayes needs a singular class column which we will save here for
-        self.class_column = None
-        self.class_data_split = {}
+        self.problem_type = None
 
         # Extract
         self.extract()
 
         # Transform
-        self.transform()
+        # self.transform()
+
+        # Split
+        pass
 
     def extract(self):
         """
@@ -50,33 +50,19 @@ class ETL:
 
         :return self.data: DataFrame, untransformed data set
         """
-        # breast-cancer
-        if self.data_name == 'breast-cancer':
-            column_names = ['ID', 'Clump_Thickness', 'Uniformity_Cell_Size', 'Uniformity_Cell_Shape',
-                            'Marginal_Adhesion', 'Single_Epithelial_Cell_Size', 'Bare_Nuclei', 'Bland_Chromatin',
-                            'Normal_Nucleoli', 'Mitoses', 'Class']
-            self.data = pd.read_csv('data\\breast-cancer-wisconsin.data', names=column_names)
-
         # glass
-        elif self.data_name == 'glass':
+        if self.data_name == 'glass':
             column_names = ['ID', 'Refractive_Index', 'Sodium', 'Magnesium', 'Aluminum', 'Silicon', 'Potassium',
                             'Calcium', 'Barium', 'Iron', 'Class']
             self.data = pd.read_csv('data\\glass.data', names=column_names)
 
-        # iris
-        elif self.data_name == 'iris':
-            column_names = ['Sepal_Length', 'Sepal_Width', 'Petal_Length', 'Petal_Width', 'Class']
-            self.data = pd.read_csv('data\\iris.data', names=column_names)
-
-        # soybean
-        elif self.data_name == 'soybean':
-            column_names = ['Date', 'Plant_Stand', 'Percip', 'Temp', 'Hail', 'Crop_Hist', 'Area_Damaged', 'Severity',
-                            'Seed_Tmt', 'Germination', 'Plant_Growth', 'Leaves', 'Leaf_Spots_Halo', 'Leaf_Spots_Marg',
-                            'Leaf_Spot_Size', 'Leaf_Shread', 'Leaf_Malf', 'Leaf_Mild', 'Stem', 'Lodging',
-                            'Stem_Cankers', 'Canker_Lesion', 'Fruiting_Bodies', 'External_Decay', 'Mycelium',
-                            'Int_Discolor', 'Sclerotia', 'Fruit_Pods', 'Fruit_Spots', 'Seed', 'Mold_Growth',
-                            'Seed_Discolor', 'Seed_Size', 'Shriveling', 'Roots', 'Class']
-            self.data = pd.read_csv('data\\soybean-small.data', names=column_names)
+        # segmentation
+        elif self.data_name == 'segmentation':
+            column_names = ['Class', 'Region_Centroid_Col', 'Region_Centroid_Row', 'Region_Pixel_Count',
+                            'Short_Line_Density_5', 'Short_Line_Density_2', 'Vedge_Mean', 'Vedge_SD', 'Hedge_Mean',
+                            'Hedge_SD', 'Intensity_Mean', 'Raw_Red_Mean', 'Raw_Blue_Mean', 'Raw_Green_Mean',
+                            'Ex_Red_Mean', 'Ex_Blue_Mean', 'Ex_Green_Mean', 'Value_Mean', 'Saturation_Mean', 'Hue_Mean']
+            self.data = pd.read_csv('data\\segmentation.data', names=column_names, skiprows=5)
 
         # vote
         elif self.data_name == 'vote':
@@ -86,6 +72,21 @@ class ETL:
                             'Synfuels_Corporation_Cutback', 'Education_Spending', 'Superfund_Right_To_Sue', 'Crime',
                             'Duty_Free_Exports', 'Export_Administration_Act_South_Africa']
             self.data = pd.read_csv('data\\house-votes-84.data', names=column_names)
+
+        # abalone
+        elif self.data_name == 'abalone':
+            column_names = ['Sex', 'Length', 'Diameter', 'Height', 'Whole_Weight', 'Shucked_Weight', 'Viscera_Weight',
+                            'Shell_Weight', 'Rings']
+            self.data = pd.read_csv('data\\abalone.data', names=column_names)
+
+        # machine
+        elif self.data_name == 'machine':
+            column_names = ['Vendor', 'Model_Name', 'MYCT', 'MMIN', 'MMAX', 'CACH', 'CHMIN', 'CHMAX', 'PRP', 'ERP']
+            self.data = pd.read_csv('data\\machine.data', names=column_names)
+
+        # forest-fires
+        elif self.data_name == 'forest-fires':
+            self.data = pd.read_csv('data\\forestfires.data')
 
         # If an incorrect data_name was specified we'll raise an error here
         else:
