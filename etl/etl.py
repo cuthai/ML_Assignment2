@@ -111,6 +111,18 @@ class ETL:
         elif self.data_name == 'vote':
             self.transform_vote()
 
+        # abalone
+        elif self.data_name == 'abalone':
+            self.transform_abalone()
+
+        # machine
+        elif self.data_name == 'machine':
+            self.transform_machine()
+
+        # forest-fires
+        elif self.data_name == 'forest-fires':
+            self.transform_forest_fires()
+
         # The extract function should catch this but lets throw again in case
         else:
             raise NameError('Please specify a predefined name for one of the 5 data sets (breast-cancer, glass, iris, '
@@ -164,6 +176,7 @@ class ETL:
         normalized_temp_df = (temp_df - temp_df.mean()) / temp_df.std()
 
         # Set the class back, the normalize above would have normalized the class as well
+        normalized_temp_df.drop(columns='Class', inplace=True)
         normalized_temp_df['Class'] = temp_df['Class']
 
         # Set attributes for ETL object, there are two total classes so this is a singular classifier
@@ -194,9 +207,91 @@ class ETL:
                                                           'Duty_Free_Exports', 'Export_Administration_Act_South_Africa']
                                         )
 
+        # Set the class back, the normalize above would have normalized the class as well
+        binned_temp_df.drop(columns='Class', inplace=True)
+        binned_temp_df['Class'] = temp_df['Class']
+
         # Set attributes for ETL object, there are two total classes so this is a singular classifier
         self.classes = 2
         self.transformed_data = binned_temp_df
+
+    def transform_abalone(self):
+        """
+        Function to transform vote data set
+
+        For this function a question mark is treated as a distinct category, since abstaining from a vote might tell us
+            about the rep's party. Since the data is somewhat categorical, there was no binning done. The data is
+            dummied based on the 3 possible values in each column.
+
+        :return self.transformed_data: DataFrame, transformed data set
+        :return self.classes: int, num of classes
+        """
+        # We'll make a deep copy of our data set
+        temp_df = pd.DataFrame.copy(self.data, deep=True)
+
+        # Normalize Data
+        normalized_temp_df = (temp_df - temp_df.mean()) / temp_df.std()
+
+        # Add Binned variables for sex
+        normalized_temp_df = normalized_temp_df.join(pd.get_dummies(temp_df['Sex'], columns=['Sex']))
+
+        # We'll remove the old binned variables and reorder our target
+        normalized_temp_df.drop(columns=['Rings', 'Sex'], inplace=True)
+        normalized_temp_df['Rings'] = temp_df['Rings']
+
+        # Set attributes for ETL object, there are two total classes so this is a singular classifier
+        self.transformed_data = normalized_temp_df
+
+    def transform_machine(self):
+        """
+        Function to transform vote data set
+
+        For this function a question mark is treated as a distinct category, since abstaining from a vote might tell us
+            about the rep's party. Since the data is somewhat categorical, there was no binning done. The data is
+            dummied based on the 3 possible values in each column.
+
+        :return self.transformed_data: DataFrame, transformed data set
+        :return self.classes: int, num of classes
+        """
+        # We'll make a deep copy of our data set
+        temp_df = pd.DataFrame.copy(self.data, deep=True)
+
+        # Normalize Data
+        normalized_temp_df = (temp_df - temp_df.mean()) / temp_df.std()
+
+        # We'll remove unneeded variables as well as denormalize the target
+        normalized_temp_df.drop(columns=['Vendor', 'Model_Name', 'ERP'], inplace=True)
+        normalized_temp_df['PRP'] = temp_df['PRP']
+
+        # Set attributes for ETL object, there are two total classes so this is a singular classifier
+        self.transformed_data = normalized_temp_df
+
+    def transform_forest_fires(self):
+        """
+        Function to transform vote data set
+
+        For this function a question mark is treated as a distinct category, since abstaining from a vote might tell us
+            about the rep's party. Since the data is somewhat categorical, there was no binning done. The data is
+            dummied based on the 3 possible values in each column.
+
+        :return self.transformed_data: DataFrame, transformed data set
+        :return self.classes: int, num of classes
+        """
+        # We'll make a deep copy of our data set
+        temp_df = pd.DataFrame.copy(self.data, deep=True)
+
+        # Normalize Data
+        normalized_temp_df = (temp_df - temp_df.mean()) / temp_df.std()
+
+        # Add Binned variables for sex
+        normalized_temp_df = normalized_temp_df.join(pd.get_dummies(temp_df[['month', 'day']], columns=['month', 'day']))
+
+        # We'll remove the old binned variables and reorder our target
+        normalized_temp_df.drop(columns=['month', 'day', 'area'], inplace=True)
+        normalized_temp_df['area'] = temp_df['area']
+
+        # Set attributes for ETL object, there are two total classes so this is a singular classifier
+        self.transformed_data = normalized_temp_df
 
     def train_test_split(self):
         """
