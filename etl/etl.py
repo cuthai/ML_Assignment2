@@ -39,7 +39,7 @@ class ETL:
         self.extract()
 
         # Transform
-        # self.transform()
+        self.transform()
 
         # Split
         pass
@@ -99,21 +99,13 @@ class ETL:
 
         This is a manager function that calls to the actual helper transform function.
         """
-        # breast-cancer
-        if self.data_name == 'breast-cancer':
-            self.transform_breast_cancer()
-
         # glass
-        elif self.data_name == 'glass':
+        if self.data_name == 'glass':
             self.transform_glass()
 
-        # iris
-        elif self.data_name == 'iris':
-            self.transform_iris()
-
-        # soybean
-        elif self.data_name == 'soybean':
-            self.transform_soybean()
+        # segmentation
+        elif self.data_name == 'segmentation':
+            self.transform_segmentation()
 
         # vote
         elif self.data_name == 'vote':
@@ -123,46 +115,6 @@ class ETL:
         else:
             raise NameError('Please specify a predefined name for one of the 5 data sets (breast-cancer, glass, iris, '
                             'soybean, vote)')
-
-    def transform_breast_cancer(self):
-        """
-        Function to transform breast-cancer data set
-
-        For this function any missing data points are removed since there are 16 missing data points which is less than
-            3% of the data. Since the data is somewhat categorical, there was no binning done. The data is dummied based
-            on the 10 values in each column.
-
-        :return self.transformed_data: DataFrame, transformed data set
-        :return self.classes: int, num of classes
-        """
-        # Remove missing data points
-        self.data = self.data.loc[self.data['Bare_Nuclei'] != '?']
-        self.data.reset_index(inplace=True, drop=True)
-
-        # We'll make a deep copy of our data set
-        temp_df = pd.DataFrame.copy(self.data, deep=True)
-
-        # We don't need ID so let's drop that
-        temp_df.drop(columns='ID', inplace=True)
-
-        # Save class column for Naive Bayes
-        self.class_column = temp_df['Class']
-
-        # Get dummies of the binned data
-        temp_df = pd.get_dummies(temp_df, columns=['Clump_Thickness', 'Uniformity_Cell_Size', 'Uniformity_Cell_Shape',
-                                                   'Marginal_Adhesion', 'Single_Epithelial_Cell_Size', 'Bare_Nuclei',
-                                                   'Bland_Chromatin', 'Normal_Nucleoli', 'Mitoses', 'Class'])
-
-        # Reset the index since dropping some of the data points will mess with the index
-        temp_df.reset_index(inplace=True, drop=True)
-        self.class_column.reset_index(inplace=True, drop=True)
-
-        # We only need one target variable, the other can be dropped
-        temp_df.drop(columns='Class_2', inplace=True)
-
-        # Set attributes for ETL object, there are two total classes so this is a singular classifier
-        self.classes = 2
-        self.transformed_data = temp_df
 
     def transform_glass(self):
         """
@@ -181,33 +133,23 @@ class ETL:
         # We don't need ID so let's drop that
         temp_df.drop(columns='ID', inplace=True)
 
-        # Save class column for Naive Bayes
-        self.class_column = temp_df['Class']
+        # Normalize Data
+        normalized_temp_df = (temp_df - temp_df.mean()) / temp_df.std()
 
-        # Bin numerical values
-        for column in ['Refractive_Index', 'Sodium', 'Magnesium', 'Aluminum', 'Silicon', 'Potassium', 'Calcium',
-                       'Barium', 'Iron']:
-            temp_df[column] = pd.cut(temp_df[column], bins=10)
-
-        # Get dummies of the binned data
-        temp_df = pd.get_dummies(temp_df, columns=['Refractive_Index', 'Sodium', 'Magnesium', 'Aluminum',
-                                                   'Silicon', 'Potassium', 'Calcium', 'Barium', 'Iron', 'Class'])
-
-        # Index clean up
-        temp_df.reset_index(inplace=True, drop=True)
-        self.class_column.reset_index(inplace=True, drop=True)
+        # Set the class back, the normalize above would have normalized the class as well
+        normalized_temp_df['Class'] = temp_df['Class']
 
         # Set attributes for ETL object, there are 6 total classes so this is a multi classifier
         self.classes = 6
-        self.transformed_data = temp_df
+        self.transformed_data = normalized_temp_df
 
-    def transform_iris(self):
+    def transform_segmentation(self):
         """
-        Function to transform iris data set
+        Function to transform vote data set
 
-        For this function numeric data is binned into groups of 10, and then dummied, similar to the breast-cancer
-            data set. There are no missing values. Since this is a multi class data set, we'll dummy the classes for now
-            and let the classifier handle the multi classes.
+        For this function a question mark is treated as a distinct category, since abstaining from a vote might tell us
+            about the rep's party. Since the data is somewhat categorical, there was no binning done. The data is
+            dummied based on the 3 possible values in each column.
 
         :return self.transformed_data: DataFrame, transformed data set
         :return self.classes: int, num of classes
@@ -215,58 +157,18 @@ class ETL:
         # We'll make a deep copy of our data set
         temp_df = pd.DataFrame.copy(self.data, deep=True)
 
-        # Bin numerical values
-        for column in ['Sepal_Length', 'Sepal_Width', 'Petal_Length', 'Petal_Width']:
-            temp_df[column] = pd.cut(temp_df[column], bins=10)
+        # Region pixel count is always 9 and is not useful for our algorithms
+        temp_df.drop(columns='Region_Pixel_Count', inplace=True)
 
-        # Save class column for Naive Bayes
-        self.class_column = temp_df['Class']
+        # Normalize Data
+        normalized_temp_df = (temp_df - temp_df.mean()) / temp_df.std()
 
-        # Get dummies of the binned data
-        temp_df = pd.get_dummies(temp_df, columns=['Sepal_Length', 'Sepal_Width', 'Petal_Length', 'Petal_Width',
-                                                   'Class'])
+        # Set the class back, the normalize above would have normalized the class as well
+        normalized_temp_df['Class'] = temp_df['Class']
 
-        # Index clean up
-        temp_df.reset_index(inplace=True, drop=True)
-        self.class_column.reset_index(inplace=True, drop=True)
-
-        # Set attributes for ETL object, there are 3 total classes so this is a multi classifier
-        self.classes = 3
-        self.transformed_data = temp_df
-
-    def transform_soybean(self):
-        """
-        Function to transform soybean data set
-
-        For this function the data is already binned. Those values are then dummied, similar to the breast-cancer
-            data set. There are no missing values. Since this is a multi class data set, we'll dummy the classes for now
-            and let the classifier handle the multi classes.
-
-        :return self.transformed_data: DataFrame, transformed data set
-        :return self.classes: int, num of classes
-        """
-        # We'll make a deep copy of our data set
-        temp_df = pd.DataFrame.copy(self.data, deep=True)
-
-        # Save class column for Naive Bayes
-        self.class_column = temp_df['Class']
-
-        # Get dummies of the binned data
-        temp_df = pd.get_dummies(temp_df, columns=['Date', 'Plant_Stand', 'Percip', 'Temp', 'Hail', 'Crop_Hist',
-                                                   'Area_Damaged', 'Severity', 'Seed_Tmt', 'Germination',
-                                                   'Plant_Growth', 'Leaves', 'Leaf_Spots_Halo', 'Leaf_Spots_Marg',
-                                                   'Leaf_Spot_Size', 'Leaf_Shread', 'Leaf_Malf', 'Leaf_Mild', 'Stem',
-                                                   'Lodging', 'Stem_Cankers', 'Canker_Lesion', 'Fruiting_Bodies',
-                                                   'External_Decay', 'Mycelium', 'Int_Discolor', 'Sclerotia',
-                                                   'Fruit_Pods', 'Fruit_Spots', 'Seed', 'Mold_Growth', 'Seed_Discolor',
-                                                   'Seed_Size', 'Shriveling', 'Roots', 'Class'])
-        # Index clean up
-        temp_df.reset_index(inplace=True, drop=True)
-        self.class_column.reset_index(inplace=True, drop=True)
-
-        # Set attributes for ETL object, there are 4 total classes so this is a multi classifier
-        self.classes = 4
-        self.transformed_data = temp_df
+        # Set attributes for ETL object, there are two total classes so this is a singular classifier
+        self.classes = 7
+        self.transformed_data = normalized_temp_df
 
     def transform_vote(self):
         """
@@ -282,28 +184,19 @@ class ETL:
         # We'll make a deep copy of our data set
         temp_df = pd.DataFrame.copy(self.data, deep=True)
 
-        # Save class column for Naive Bayes
-        self.class_column = temp_df['Class']
-
         # Get dummies of the binned data
-        temp_df = pd.get_dummies(temp_df, columns=['Handicapped_Infants', 'Water_Project_Cost_Sharing',
-                                                   'Adoption_Budget_Resolution', 'Physician_Fee_Freeze',
-                                                   'El_Salvador_Aid', 'Religious_Groups_School',
-                                                   'Anti_Satellite_Test_Ban', 'Aid_Nicaraguan_Contras', 'MX_Missile',
-                                                   'Immigration', 'Synfuels_Corporation_Cutback', 'Education_Spending',
-                                                   'Superfund_Right_To_Sue', 'Crime', 'Duty_Free_Exports',
-                                                   'Export_Administration_Act_South_Africa', 'Class'])
-
-        # Index clean up
-        temp_df.reset_index(inplace=True, drop=True)
-        self.class_column.reset_index(inplace=True, drop=True)
-
-        # We only need one target variable, the other can be dropped
-        temp_df.drop(columns='Class_democrat', inplace=True)
+        binned_temp_df = pd.get_dummies(temp_df, columns=['Handicapped_Infants', 'Water_Project_Cost_Sharing',
+                                                          'Adoption_Budget_Resolution', 'Physician_Fee_Freeze',
+                                                          'El_Salvador_Aid', 'Religious_Groups_School',
+                                                          'Anti_Satellite_Test_Ban', 'Aid_Nicaraguan_Contras',
+                                                          'MX_Missile', 'Immigration', 'Synfuels_Corporation_Cutback',
+                                                          'Education_Spending', 'Superfund_Right_To_Sue', 'Crime',
+                                                          'Duty_Free_Exports', 'Export_Administration_Act_South_Africa']
+                                        )
 
         # Set attributes for ETL object, there are two total classes so this is a singular classifier
         self.classes = 2
-        self.transformed_data = temp_df
+        self.transformed_data = binned_temp_df
 
     def train_test_split(self):
         """
