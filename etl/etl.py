@@ -42,7 +42,10 @@ class ETL:
         self.transform()
 
         # Split
-        self.cv_split()
+        if self.classes == 0:
+            self.cv_split_regression()
+        else:
+            self.cv_split_classification()
 
     def extract(self):
         """
@@ -293,7 +296,55 @@ class ETL:
         # Set attributes for ETL object, there are two total classes so this is a singular classifier
         self.transformed_data = normalized_temp_df
 
-    def cv_split(self):
+    def cv_split_classification(self):
+        """
+        Function to split our transformed data into 10% tune, 60% train, 30% test
+
+        This function randomizes a number and also the order of the 3 resulting data sets. This ensures that our fit
+            is on random ordering as well. The split DataFrames are then added back as a dictionary to the ETL object.
+            For the soybean data set, 10% tune would be only 4 data points so the tune and train are set to 70% vs 30%
+            test.
+
+        :return self.data_split: dict (of DataFrames), dictionary with keys (tune, train, test) referring to the split
+            transformed data
+        """
+        # Define base data size and size of tune and train
+        data_size = len(self.transformed_data)
+        tune_size = int(data_size / 10)
+        cv_size = int((data_size - tune_size) / 5)
+        extra_data = int((data_size - tune_size) % 5)
+
+        # Check and set the random seed
+        if self.random_state:
+            np.random.seed(self.random_state)
+
+        # Sample for tune
+        tune_splitter = []
+
+        for index in range(tune_size):
+            tune_splitter.append(np.random.choice(a=10) + (10 * index))
+
+        self.data_split.update({
+            'tune': self.transformed_data.iloc[tune_splitter]
+        })
+
+        # Determine the remaining index that weren't picked for tune
+        remainder = list(set(self.transformed_data.index) - set(tune_splitter))
+        remainder_df = pd.DataFrame(self.transformed_data.iloc[remainder]['Class'])
+        remainder_df['Random_Number'] = np.random.randint(0, len(remainder), remainder_df.shape[0])
+        remainder_df.sort_values(by=['Class', 'Random_Number'], inplace=True)
+        remainder_df.reset_index(inplace=True)
+
+        # Sample for CV
+        for index in range(5):
+            splitter = remainder_df.loc[remainder_df.index % 5 == index]['index']
+
+            # Update our attribute with the dictionary defining the train, tune, and test data sets
+            self.data_split.update({
+                index: self.transformed_data.iloc[splitter]
+            })
+
+    def cv_split_regression(self):
         """
         Function to split our transformed data into 10% tune, 60% train, 30% test
 
