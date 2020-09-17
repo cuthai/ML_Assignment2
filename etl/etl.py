@@ -42,7 +42,7 @@ class ETL:
         self.transform()
 
         # Split
-        pass
+        self.cv_split()
 
     def extract(self):
         """
@@ -293,7 +293,7 @@ class ETL:
         # Set attributes for ETL object, there are two total classes so this is a singular classifier
         self.transformed_data = normalized_temp_df
 
-    def train_test_split(self):
+    def cv_split(self):
         """
         Function to split our transformed data into 10% tune, 60% train, 30% test
 
@@ -308,51 +308,33 @@ class ETL:
         # Define base data size and size of tune and train
         data_size = len(self.transformed_data)
         tune_size = int(data_size / 10)
-        train_size = int(data_size * (6 / 10))
+        cv_size = int((data_size - tune_size) / 5)
+        extra_data = int((data_size - tune_size) % 5)
 
         # Check and set the random seed
         if self.random_state:
             np.random.seed(self.random_state)
 
-        # Generate a list of the size of our data and randomly pick 60% without replacement for train
-        train_splitter = np.random.choice(a=data_size, size=train_size, replace=False)
-
-        # Determine the remaining index that weren't picked for train
-        remainder = list(set(self.transformed_data.index) - set(train_splitter))
-
-        # Sample from the remainder 10%
-        tune_splitter = np.random.choice(a=remainder, size=tune_size, replace=False)
-
-        # Determine of the remainder what was picked for tune, leaving us with 30% for test
-        test_splitter = list(set(remainder) - set(tune_splitter))
-
-        # If we are working with soybean, we need to add the train and tune together otherwise tune is too small
-        # We'll use the same data set for both train and tune
-        if self.data_name == 'soybean':
-            train_splitter = np.concatenate([train_splitter, tune_splitter])
-            tune_splitter = train_splitter
-
-        # Update our attribute with the dictionary defining the train, tune, and test data sets
+        # Sample for tune
+        tune_splitter = np.random.choice(a=data_size, size=tune_size, replace=False)
         self.data_split.update({
-            'train': self.transformed_data.iloc[train_splitter],
-            'tune': self.transformed_data.iloc[tune_splitter],
-            'test': self.transformed_data.iloc[test_splitter]
+            'tune': self.transformed_data.iloc[tune_splitter]
         })
 
-        # Update our attribute with the dictionary defining the train, tune, and test data sets for class column only
-        self.class_data_split.update({
-            'train': self.class_column.iloc[train_splitter],
-            'tune': self.class_column.iloc[tune_splitter],
-            'test': self.class_column.iloc[test_splitter]
-        })
+        # Determine the remaining index that weren't picked for tune
+        remainder = list(set(self.transformed_data.index) - set(tune_splitter))
 
-    def update_data_name(self, class_name):
-        """
-        Helper function for multi class
+        for index in range(1, 6):
+            if index <= extra_data:
+                splitter = np.random.choice(a=remainder, size=(cv_size + 1), replace=False)
 
-        Updates the data name to include the class name if there are multiple classes
+            else:
+                # Generate a list of the size of our data and randomly pick 60% without replacement for train
+                splitter = np.random.choice(a=remainder, size=cv_size, replace=False)
 
-        :param class_name: str, class name to append to the data name
-        :return self.data_name: str, updated data name
-        """
-        self.data_name = f'{self.data_name}_{class_name}'
+            remainder = list(set(remainder) - set(splitter))
+
+            # Update our attribute with the dictionary defining the train, tune, and test data sets
+            self.data_split.update({
+                index: self.transformed_data.iloc[splitter]
+            })
