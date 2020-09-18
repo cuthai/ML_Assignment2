@@ -13,7 +13,7 @@ class KNNClassifier:
         tune_data = self.data_split['tune']
         tune_x = tune_data.iloc[:, :-1]
 
-        tune_results = {k: [0, 0, 0, 0, 0] for k in range(1, 22, 2)}
+        tune_results = {k: [0, 0, 0, 0, 0] for k in range(3, 22, 2)}
 
         for index in range(5):
             test_index = [test_index for test_index in [0, 1, 2, 3, 4] if test_index != index]
