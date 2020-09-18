@@ -9,30 +9,35 @@ class KNNClassifier:
         self.tune_results = {}
         self.k = 1
 
-    def tune(self):
+        self.test_results = {}
+
+    def tune(self, k_range=None):
+        if not k_range:
+            k_range = list(range(3, 22, 2))
+
         tune_data = self.data_split['tune']
         tune_x = tune_data.iloc[:, :-1]
 
-        tune_results = {k: [0, 0, 0, 0, 0] for k in range(3, 22, 2)}
+        tune_results = {k: [0, 0, 0, 0, 0] for k in k_range}
 
         for index in range(5):
-            test_index = [test_index for test_index in [0, 1, 2, 3, 4] if test_index != index]
+            train_index = [train_index for train_index in [0, 1, 2, 3, 4] if train_index != index]
 
-            test_data = pd.DataFrame()
-            for data_split_index in test_index:
-                test_data = test_data.append(self.data_split[data_split_index])
-            test_x = test_data.iloc[:, :-1]
+            train_data = pd.DataFrame()
+            for data_split_index in train_index:
+                train_data = train_data.append(self.data_split[data_split_index])
+            train_x = train_data.iloc[:, :-1]
 
             for tune_row_index, row in tune_x.iterrows():
-                distances = ((test_x - row) ** 2).sum(axis=1).sort_values()
+                distances = ((train_x - row) ** 2).sum(axis=1).sort_values()
 
                 for k in tune_results.keys():
                     neighbors = distances[:k].index.to_list()
-                    classes = test_data.loc[neighbors, 'Class']
+                    classes = train_data.loc[neighbors, 'Class']
 
                     class_occurrence = classes.mode()
                     if len(class_occurrence) > 1:
-                        classification = test_data.loc[neighbors[0], 'Class']
+                        classification = train_data.loc[neighbors[0], 'Class']
                     else:
                         classification = class_occurrence[0]
 
@@ -44,3 +49,38 @@ class KNNClassifier:
 
         self.tune_results = tune_results
         self.k = min(tune_results, key=tune_results.get)
+
+    def predict(self):
+        test_results = {index: 0 for index in range(5)}
+        test_classification = pd.DataFrame()
+
+        for index in range(5):
+            train_index = [train_index for train_index in [0, 1, 2, 3, 4] if train_index != index]
+
+            train_data = pd.DataFrame()
+            for data_split_index in train_index:
+                train_data = train_data.append(self.data_split[data_split_index])
+            train_x = train_data.iloc[:, :-1]
+
+            test_data = self.data_split[index]
+            test_x = test_data.iloc[:, :-1]
+
+            for tune_row_index, row in test_x.iterrows():
+                distances = ((train_x - row) ** 2).sum(axis=1).sort_values()
+
+                neighbors = distances[:self.k].index.to_list()
+                classes = train_data.loc[neighbors, 'Class']
+
+                class_occurrence = classes.mode()
+                if len(class_occurrence) > 1:
+                    classification = train_data.loc[neighbors[0], 'Class']
+                else:
+                    classification = class_occurrence[0]
+
+                if classification != test_data.loc[tune_row_index, 'Class']:
+                    test_results[index] += 1
+
+        for k in test_results.keys():
+            test_results[k] = test_results[k] / len(test_data)
+
+        self.test_results = test_results
