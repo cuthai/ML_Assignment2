@@ -26,6 +26,9 @@ def main():
 
     knn_model.tune()
 
+    if arguments.knn_type == 'edited':
+        knn_model.fit_edited()
+
     knn_model.predict()
 
     pass

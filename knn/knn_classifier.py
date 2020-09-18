@@ -83,12 +83,6 @@ class KNNClassifier:
         self.test_results = test_results
 
     def fit(self):
-        if self.knn_type == 'edited':
-            self.fit_edited()
-        else:
-            self.fit_regular()
-
-    def fit_regular(self):
         for index in range(5):
             train_index = [train_index for train_index in [0, 1, 2, 3, 4] if train_index != index]
 
@@ -99,4 +93,41 @@ class KNNClassifier:
             self.train_data.update({index: train_data})
 
     def fit_edited(self):
-        pass
+        import datetime
+
+        for index in range(5):
+            print(index)
+            print(datetime.datetime.today())
+            self.edit(index)
+            print(datetime.datetime.today())
+
+    def edit(self, index, k=None):
+        if not k:
+            k = self.k
+
+        train_data = self.train_data[index]
+        train_x = train_data.iloc[:, :-1]
+
+        edit_out_list = []
+
+        for test_row_index, row in train_data.iterrows():
+            distances = ((train_x - row) ** 2).sum(axis=1).sort_values()[1:]
+
+            neighbors = distances[:k].index.to_list()
+            classes = train_data.loc[neighbors, 'Class']
+
+            class_occurrence = classes.mode()
+            if len(class_occurrence) > 1:
+                classification = train_data.loc[neighbors[0], 'Class']
+            else:
+                classification = class_occurrence[0]
+
+            if classification != train_data.loc[test_row_index, 'Class']:
+                edit_out_list.append(test_row_index)
+
+        train_data = train_data.loc[~train_data.index.isin(edit_out_list)]
+
+        self.train_data.update({index: train_data})
+
+        if len(edit_out_list) > 0:
+            self.edit(index)
