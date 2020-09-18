@@ -2,9 +2,12 @@ import pandas as pd
 
 
 class KNNClassifier:
-    def __init__(self, etl):
+    def __init__(self, etl, knn_type):
         self.etl = etl
         self.data_split = etl.data_split
+        self.knn_type = knn_type
+
+        self.train_data = {}
 
         self.tune_results = {}
         self.k = 1
@@ -21,11 +24,7 @@ class KNNClassifier:
         tune_results = {k: [0, 0, 0, 0, 0] for k in k_range}
 
         for index in range(5):
-            train_index = [train_index for train_index in [0, 1, 2, 3, 4] if train_index != index]
-
-            train_data = pd.DataFrame()
-            for data_split_index in train_index:
-                train_data = train_data.append(self.data_split[data_split_index])
+            train_data = self.train_data[index]
             train_x = train_data.iloc[:, :-1]
 
             for tune_row_index, row in tune_x.iterrows():
@@ -50,25 +49,24 @@ class KNNClassifier:
         self.tune_results = tune_results
         self.k = min(tune_results, key=tune_results.get)
 
-    def predict(self):
+    def predict(self, k=None):
+        if not k:
+            k = self.k
+
         test_results = {index: 0 for index in range(5)}
         test_classification = pd.DataFrame()
 
         for index in range(5):
-            train_index = [train_index for train_index in [0, 1, 2, 3, 4] if train_index != index]
-
-            train_data = pd.DataFrame()
-            for data_split_index in train_index:
-                train_data = train_data.append(self.data_split[data_split_index])
+            train_data = self.train_data[index]
             train_x = train_data.iloc[:, :-1]
 
             test_data = self.data_split[index]
             test_x = test_data.iloc[:, :-1]
 
-            for tune_row_index, row in test_x.iterrows():
+            for test_row_index, row in test_x.iterrows():
                 distances = ((train_x - row) ** 2).sum(axis=1).sort_values()
 
-                neighbors = distances[:self.k].index.to_list()
+                neighbors = distances[:k].index.to_list()
                 classes = train_data.loc[neighbors, 'Class']
 
                 class_occurrence = classes.mode()
@@ -77,10 +75,28 @@ class KNNClassifier:
                 else:
                     classification = class_occurrence[0]
 
-                if classification != test_data.loc[tune_row_index, 'Class']:
+                if classification != test_data.loc[test_row_index, 'Class']:
                     test_results[index] += 1
 
-        for k in test_results.keys():
-            test_results[k] = test_results[k] / len(test_data)
+            test_results[index] = test_results[index] / len(test_data)
 
         self.test_results = test_results
+
+    def fit(self):
+        if self.knn_type == 'edited':
+            self.fit_edited()
+        else:
+            self.fit_regular()
+
+    def fit_regular(self):
+        for index in range(5):
+            train_index = [train_index for train_index in [0, 1, 2, 3, 4] if train_index != index]
+
+            train_data = pd.DataFrame()
+            for data_split_index in train_index:
+                train_data = train_data.append(self.data_split[data_split_index])
+
+            self.train_data.update({index: train_data})
+
+    def fit_edited(self):
+        pass

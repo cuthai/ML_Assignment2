@@ -12,12 +12,17 @@ def main():
         'data_name': arguments.data_name,
         'random_state': arguments.random_state
     }
-
-    # Perform ETL
     etl = ETL(**kwargs)
 
+    # Set up kwargs for KNN
+    kwargs = {
+        'etl': etl,
+        'knn_type': arguments.knn_type
+    }
     # KNN
-    knn_model = KNNClassifier(etl)
+    knn_model = KNNClassifier(**kwargs)
+
+    knn_model.fit()
 
     knn_model.tune()
 

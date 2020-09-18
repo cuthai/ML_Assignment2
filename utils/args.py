@@ -18,7 +18,8 @@ def args():
     parser.add_argument('-dn', '--data_name', help='Specify data name to extract and process')
     parser.add_argument('-rs', '--random_state', default=1, type=int,
                         help='Specify a seed to pass to the data splitter')
-    parser.add_argument('-nb', '--naive_bayes', action='store_true', help='Specify the Naive Bayes classifier instead')
+    parser.add_argument('-kt', '--knn_type', type=str,
+                        help='Specify type of KNN, ignore for the original KNN, otherwise pass <edited> or <condensed>')
 
     # Parse arguments
     command_args = parser.parse_args()
