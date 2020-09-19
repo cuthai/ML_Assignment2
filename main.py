@@ -26,8 +26,8 @@ def main():
 
     knn_model.tune()
 
-    if arguments.knn_type == 'edited':
-        knn_model.fit_edited()
+    if arguments.knn_type in ['edited', 'condensed']:
+        knn_model.fit_modified()
 
     knn_model.predict()
 

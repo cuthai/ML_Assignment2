@@ -92,13 +92,16 @@ class KNNClassifier:
 
             self.train_data.update({index: train_data})
 
-    def fit_edited(self):
+    def fit_modified(self):
         import datetime
 
         for index in range(5):
             print(index)
             print(datetime.datetime.today())
-            self.edit(index)
+            if self.knn_type == 'edited':
+                self.edit(index)
+            else:
+                self.condense(index)
             print(datetime.datetime.today())
 
     def edit(self, index, k=None):
@@ -110,7 +113,7 @@ class KNNClassifier:
 
         edit_out_list = []
 
-        for test_row_index, row in train_data.iterrows():
+        for row_index, row in train_data.iterrows():
             distances = ((train_x - row) ** 2).sum(axis=1).sort_values()[1:]
 
             neighbors = distances[:k].index.to_list()
@@ -122,8 +125,8 @@ class KNNClassifier:
             else:
                 classification = class_occurrence[0]
 
-            if classification != train_data.loc[test_row_index, 'Class']:
-                edit_out_list.append(test_row_index)
+            if classification != train_data.loc[row_index, 'Class']:
+                edit_out_list.append(row_index)
 
         train_data = train_data.loc[~train_data.index.isin(edit_out_list)]
 
@@ -131,3 +134,28 @@ class KNNClassifier:
 
         if len(edit_out_list) > 0:
             self.edit(index)
+
+    def condense(self, index, z_data=None):
+        temp_train_data = self.train_data[index]
+
+        if z_data is None:
+            z_data = pd.DataFrame(temp_train_data.iloc[0, :]).T
+        z_data_x = z_data.iloc[:, :-1]
+
+        condense_in_count = 0
+
+        for row_index, row in temp_train_data.iterrows():
+            distances = ((z_data_x - row) ** 2).sum(axis=1).sort_values()
+
+            neighbor = distances.index.to_list()[0]
+            classification = z_data.loc[neighbor, 'Class']
+
+            if classification != temp_train_data.loc[row_index, 'Class']:
+                condense_in_count += 1
+                z_data = z_data.append(temp_train_data.loc[row_index])
+                z_data_x = z_data.iloc[:, :-1]
+
+        if condense_in_count > 0:
+            self.condense(index, z_data)
+        else:
+            self.train_data.update({index: z_data})
