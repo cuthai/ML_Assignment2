@@ -93,8 +93,8 @@ class ETL:
 
         # If an incorrect data_name was specified we'll raise an error here
         else:
-            raise NameError('Please specify a predefined name for one of the 5 data sets (breast-cancer, glass, iris, '
-                            'soybean, vote)')
+            raise NameError('Please specify a predefined name for one of the 6 data sets (glass, segmentation, vote,'
+                            'abalone, machine, forest-fires)')
 
     def transform(self):
         """
@@ -128,8 +128,8 @@ class ETL:
 
         # The extract function should catch this but lets throw again in case
         else:
-            raise NameError('Please specify a predefined name for one of the 5 data sets (breast-cancer, glass, iris, '
-                            'soybean, vote)')
+            raise NameError('Please specify a predefined name for one of the 6 data sets (glass, segmentation, vote,'
+                            'abalone, machine, forest-fires)')
 
     def transform_glass(self):
         """

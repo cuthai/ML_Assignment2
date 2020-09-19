@@ -1,7 +1,9 @@
 import pandas as pd
+import numpy as np
+import math
 
 
-class KNNClassifier:
+class KNNRegressor:
     def __init__(self, etl, knn_type):
         self.etl = etl
         self.data_split = etl.data_split
@@ -15,8 +17,8 @@ class KNNClassifier:
         self.test_results = {}
 
     def fit(self):
-        for index in range(5):
-            train_index = [train_index for train_index in [0, 1, 2, 3, 4] if train_index != index]
+        for index in range(1, 6):
+            train_index = [train_index for train_index in [1, 2, 3, 4, 5] if train_index != index]
 
             train_data = pd.DataFrame()
             for data_split_index in train_index:
@@ -24,34 +26,37 @@ class KNNClassifier:
 
             self.train_data.update({index: train_data})
 
-    def tune(self, k_range=None):
+    def tune(self, k_range=None, sigma_range=None):
         if not k_range:
             k_range = list(range(3, 22, 2))
 
+        if not sigma_range:
+            sigma_range = np.linspace(.5, 3, 6)
+
         tune_data = self.data_split['tune']
         tune_x = tune_data.iloc[:, :-1]
+        tune_y = tune_data.iloc[:, -1]
 
         tune_results = {k: [0, 0, 0, 0, 0] for k in k_range}
 
-        for index in range(5):
+        for index in range(1, 6):
             train_data = self.train_data[index]
             train_x = train_data.iloc[:, :-1]
+            train_y = train_data.iloc[:, -1]
 
             for row_index, row in tune_x.iterrows():
                 distances = ((train_x - row) ** 2).sum(axis=1).sort_values()
+                kernel = distances.apply(lambda row_distance: math.exp((1 / 2 * sigma_range[0]) * row_distance))
 
                 for k in tune_results.keys():
                     neighbors = distances[:k].index.to_list()
-                    classes = train_data.loc[neighbors, 'Class']
+                    neighbors_kernel = kernel.loc[neighbors]
+                    neighbors_r = train_y.loc[neighbors]
 
-                    class_occurrence = classes.mode()
-                    if len(class_occurrence) > 1:
-                        classification = train_data.loc[neighbors[0], 'Class']
-                    else:
-                        classification = class_occurrence[0]
+                    prediction = sum(neighbors_kernel * neighbors_r) / sum(neighbors_kernel)
+                    actual = tune_y.loc[row_index]
 
-                    if classification != tune_data.loc[row_index, 'Class']:
-                        tune_results[k][index] += 1
+                    tune_results[k][index - 1] += (actual - prediction) ** 2
 
         for k in tune_results.keys():
             tune_results[k] = sum(tune_results[k]) / (len(tune_data) * 5)

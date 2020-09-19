@@ -1,6 +1,7 @@
 from utils.args import args
 from etl.etl import ETL
 from knn.knn_classifier import KNNClassifier
+from knn.knn_regressor import KNNRegressor
 
 
 def main():
@@ -20,7 +21,10 @@ def main():
         'knn_type': arguments.knn_type
     }
     # KNN
-    knn_model = KNNClassifier(**kwargs)
+    if arguments.data_name in ['glass', 'segmentation', 'vote']:
+        knn_model = KNNClassifier(**kwargs)
+    else:
+        knn_model = KNNRegressor(**kwargs)
 
     knn_model.fit()
 
