@@ -13,6 +13,7 @@ class KNNRegressor:
 
         self.tune_results = {}
         self.k = 1
+        self.sigma = 1
 
         self.test_results = {}
 
@@ -26,18 +27,26 @@ class KNNRegressor:
 
             self.train_data.update({index: train_data})
 
-    def tune(self, k_range=None, sigma_range=None):
+    def tune(self, k_range=None, k=None, sigma_range=None, sigma=None):
+        import datetime
+        print(datetime.datetime.now())
+        self.tune_k(k_range, sigma)
+        print(datetime.datetime.now())
+        self.tune_sigma(k, sigma_range)
+        print(datetime.datetime.now())
+
+    def tune_k(self, k_range=None, sigma=None):
         if not k_range:
             k_range = list(range(3, 22, 2))
 
-        if not sigma_range:
-            sigma_range = np.linspace(.5, 3, 6)
+        if not sigma:
+            sigma = self.sigma
 
         tune_data = self.data_split['tune']
         tune_x = tune_data.iloc[:, :-1]
         tune_y = tune_data.iloc[:, -1]
 
-        tune_results = {k: [0, 0, 0, 0, 0] for k in k_range}
+        tune_results = {'k': {k: [0, 0, 0, 0, 0] for k in k_range}}
 
         for index in range(1, 6):
             train_data = self.train_data[index]
@@ -46,23 +55,61 @@ class KNNRegressor:
 
             for row_index, row in tune_x.iterrows():
                 distances = ((train_x - row) ** 2).sum(axis=1).sort_values()
-                kernel = distances.apply(lambda row_distance: math.exp((1 / 2 * sigma_range[0]) * row_distance))
 
-                for k in tune_results.keys():
-                    neighbors = distances[:k].index.to_list()
-                    neighbors_kernel = kernel.loc[neighbors]
-                    neighbors_r = train_y.loc[neighbors]
+                for k in tune_results['k'].keys():
+                    neighbors = distances[:k]
 
-                    prediction = sum(neighbors_kernel * neighbors_r) / sum(neighbors_kernel)
+                    kernel = neighbors.apply(lambda row_distance: math.exp((1 / (2 * sigma)) * row_distance))
+                    neighbors_r = train_y.loc[neighbors.index.to_list()]
+
+                    prediction = sum(kernel * neighbors_r) / sum(kernel)
                     actual = tune_y.loc[row_index]
 
-                    tune_results[k][index - 1] += (actual - prediction) ** 2
+                    tune_results['k'][k][index - 1] += (actual - prediction) ** 2
 
-        for k in tune_results.keys():
-            tune_results[k] = sum(tune_results[k]) / (len(tune_data) * 5)
+        for k in tune_results['k'].keys():
+            tune_results['k'][k] = sum(tune_results['k'][k]) / (len(tune_data) * 5)
 
-        self.tune_results = tune_results
-        self.k = min(tune_results, key=tune_results.get)
+        self.tune_results.update(tune_results)
+        self.k = min(tune_results['k'], key=tune_results['k'].get)
+
+    def tune_sigma(self, k=None, sigma_range=None):
+        if not k:
+            k = self.k
+
+        if not sigma_range:
+            sigma_range = np.linspace(.5, 3, 6)
+
+        tune_data = self.data_split['tune']
+        tune_x = tune_data.iloc[:, :-1]
+        tune_y = tune_data.iloc[:, -1]
+
+        tune_results = {'sigma': {sigma: [0, 0, 0, 0, 0] for sigma in sigma_range}}
+
+        for index in range(1, 6):
+            train_data = self.train_data[index]
+            train_x = train_data.iloc[:, :-1]
+            train_y = train_data.iloc[:, -1]
+
+            for row_index, row in tune_x.iterrows():
+                distances = ((train_x - row) ** 2).sum(axis=1).sort_values()[:k]
+
+                for sigma in tune_results['sigma'].keys():
+                    neighbors = distances[:k]
+
+                    kernel = neighbors.apply(lambda row_distance: math.exp((1 / (2 * sigma)) * row_distance))
+                    neighbors_r = train_y.loc[neighbors.index.to_list()]
+
+                    prediction = sum(kernel * neighbors_r) / sum(kernel)
+                    actual = tune_y.loc[row_index]
+
+                    tune_results['sigma'][sigma][index - 1] += (actual - prediction) ** 2
+
+        for sigma in tune_results['sigma'].keys():
+            tune_results['sigma'][sigma] = sum(tune_results['sigma'][sigma]) / (len(tune_data) * 5)
+
+        self.tune_results.update(tune_results)
+        self.sigma = min(tune_results['sigma'], key=tune_results['sigma'].get)
 
     def fit_modified(self):
         import datetime
@@ -132,34 +179,37 @@ class KNNRegressor:
         else:
             self.train_data.update({index: z_data})
 
-    def predict(self, k=None):
+    def predict(self, k=None, sigma=None):
         if not k:
             k = self.k
 
-        test_results = {index: 0 for index in range(5)}
+        if not sigma:
+            sigma = self.sigma
+
+        test_results = {index: 0 for index in range(1, 6)}
         test_classification = pd.DataFrame()
 
-        for index in range(5):
+        for index in range(1, 6):
             train_data = self.train_data[index]
             train_x = train_data.iloc[:, :-1]
+            train_y = train_data.iloc[:, -1]
 
             test_data = self.data_split[index]
             test_x = test_data.iloc[:, :-1]
+            test_y = test_data.iloc[:, -1]
 
-            for test_row_index, row in test_x.iterrows():
+            for row_index, row in test_x.iterrows():
                 distances = ((train_x - row) ** 2).sum(axis=1).sort_values()
 
-                neighbors = distances[:k].index.to_list()
-                classes = train_data.loc[neighbors, 'Class']
+                neighbors = distances[:k]
 
-                class_occurrence = classes.mode()
-                if len(class_occurrence) > 1:
-                    classification = train_data.loc[neighbors[0], 'Class']
-                else:
-                    classification = class_occurrence[0]
+                kernel = neighbors.apply(lambda row_distance: math.exp((1 / (2 * sigma)) * row_distance))
+                neighbors_r = train_y.loc[neighbors.index.to_list()]
 
-                if classification != test_data.loc[test_row_index, 'Class']:
-                    test_results[index] += 1
+                prediction = sum(kernel * neighbors_r) / sum(kernel)
+                actual = test_y.loc[row_index]
+
+                test_results[index] += (actual - prediction) ** 2
 
             test_results[index] = test_results[index] / len(test_data)
 

@@ -141,7 +141,7 @@ class KNNClassifier:
             test_data = self.data_split[index]
             test_x = test_data.iloc[:, :-1]
 
-            for test_row_index, row in test_x.iterrows():
+            for row_index, row in test_x.iterrows():
                 distances = ((train_x - row) ** 2).sum(axis=1).sort_values()
 
                 neighbors = distances[:k].index.to_list()
@@ -153,7 +153,7 @@ class KNNClassifier:
                 else:
                     classification = class_occurrence[0]
 
-                if classification != test_data.loc[test_row_index, 'Class']:
+                if classification != test_data.loc[row_index, 'Class']:
                     test_results[index] += 1
 
             test_results[index] = test_results[index] / len(test_data)
