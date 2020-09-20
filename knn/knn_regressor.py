@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import math
+import copy
 
 
 class KNNRegressor:
@@ -14,12 +15,13 @@ class KNNRegressor:
         self.tune_results = {}
         self.k = 1
         self.sigma = 1
+        self.epsilon = .05
 
         self.test_results = {}
 
     def fit(self):
-        for index in range(1, 6):
-            train_index = [train_index for train_index in [1, 2, 3, 4, 5] if train_index != index]
+        for index in range(5):
+            train_index = [train_index for train_index in [0, 1, 2, 3, 4] if train_index != index]
 
             train_data = pd.DataFrame()
             for data_split_index in train_index:
@@ -48,7 +50,7 @@ class KNNRegressor:
 
         tune_results = {'k': {k: [0, 0, 0, 0, 0] for k in k_range}}
 
-        for index in range(1, 6):
+        for index in range(5):
             train_data = self.train_data[index]
             train_x = train_data.iloc[:, :-1]
             train_y = train_data.iloc[:, -1]
@@ -65,7 +67,7 @@ class KNNRegressor:
                     prediction = sum(kernel * neighbors_r) / sum(kernel)
                     actual = tune_y.loc[row_index]
 
-                    tune_results['k'][k][index - 1] += (actual - prediction) ** 2
+                    tune_results['k'][k][index] += (actual - prediction) ** 2
 
         for k in tune_results['k'].keys():
             tune_results['k'][k] = sum(tune_results['k'][k]) / (len(tune_data) * 5)
@@ -86,7 +88,7 @@ class KNNRegressor:
 
         tune_results = {'sigma': {sigma: [0, 0, 0, 0, 0] for sigma in sigma_range}}
 
-        for index in range(1, 6):
+        for index in range(5):
             train_data = self.train_data[index]
             train_x = train_data.iloc[:, :-1]
             train_y = train_data.iloc[:, -1]
@@ -103,7 +105,7 @@ class KNNRegressor:
                     prediction = sum(kernel * neighbors_r) / sum(kernel)
                     actual = tune_y.loc[row_index]
 
-                    tune_results['sigma'][sigma][index - 1] += (actual - prediction) ** 2
+                    tune_results['sigma'][sigma][index] += (actual - prediction) ** 2
 
         for sigma in tune_results['sigma'].keys():
             tune_results['sigma'][sigma] = sum(tune_results['sigma'][sigma]) / (len(tune_data) * 5)
@@ -111,48 +113,79 @@ class KNNRegressor:
         self.tune_results.update(tune_results)
         self.sigma = min(tune_results['sigma'], key=tune_results['sigma'].get)
 
-    def fit_modified(self):
-        import datetime
+    def fit_modified(self, epsilon_range=None):
+        if not epsilon_range:
+            epsilon_range = [.1, .05, .01]
 
-        for index in range(5):
-            print(index)
-            print(datetime.datetime.today())
-            if self.knn_type == 'edited':
-                self.edit(index)
-            else:
-                self.condense(index)
-            print(datetime.datetime.today())
+        max_mse = 0
+        epsilon_mse = 0
+        temp_train_data = {epsilon: {} for epsilon in epsilon_range}
+        max_train_data = None
 
-    def edit(self, index, k=None):
+        self.tune_results['epsilon'] = {}
+
+        for epsilon in epsilon_range:
+            for index in range(5):
+                if self.knn_type == 'edited':
+                    train_data, mse = self.edit(copy.deepcopy(self.train_data[index]), epsilon=epsilon)
+
+                    epsilon_mse += mse
+                    temp_train_data[epsilon].update({index: train_data})
+
+                else:
+                    self.condense(index)
+
+            average_mse = epsilon_mse / 5
+
+            if average_mse > max_mse:
+                max_mse = average_mse
+                max_train_data = temp_train_data[epsilon]
+                self.epsilon = epsilon
+
+            self.tune_results['epsilon'].update({epsilon: average_mse})
+
+        self.train_data = max_train_data
+
+    def edit(self, temp_train_data, k=None, sigma=None, epsilon=None):
         if not k:
             k = self.k
 
-        train_data = self.train_data[index]
+        if not sigma:
+            sigma = self.sigma
+
+        if not epsilon:
+            epsilon = self.epsilon
+
+        train_data = temp_train_data
         train_x = train_data.iloc[:, :-1]
+        train_y = train_data.iloc[:, -1]
 
         edit_out_list = []
 
         for row_index, row in train_data.iterrows():
             distances = ((train_x - row) ** 2).sum(axis=1).sort_values()[1:]
 
-            neighbors = distances[:k].index.to_list()
-            classes = train_data.loc[neighbors, 'Class']
+            neighbors = distances[:k]
 
-            class_occurrence = classes.mode()
-            if len(class_occurrence) > 1:
-                classification = train_data.loc[neighbors[0], 'Class']
-            else:
-                classification = class_occurrence[0]
+            kernel = neighbors.apply(lambda row_distance: math.exp((1 / (2 * sigma)) * row_distance))
+            neighbors_r = train_y.loc[neighbors.index.to_list()]
 
-            if classification != train_data.loc[row_index, 'Class']:
+            prediction = sum(kernel * neighbors_r) / sum(kernel)
+            actual = train_y.loc[row_index]
+
+            percent_different = abs((prediction - actual) / actual)
+
+            if percent_different > epsilon:
                 edit_out_list.append(row_index)
 
         train_data = train_data.loc[~train_data.index.isin(edit_out_list)]
 
-        self.train_data.update({index: train_data})
-
         if len(edit_out_list) > 0:
-            self.edit(index)
+            train_data, mse = self.edit(train_data)
+        else:
+            mse = self.tune_epsilon(train_data)
+
+        return train_data, mse
 
     def condense(self, index, z_data=None):
         temp_train_data = self.train_data[index]
@@ -179,6 +212,39 @@ class KNNRegressor:
         else:
             self.train_data.update({index: z_data})
 
+    def tune_epsilon(self, train_data, k=None, sigma=None):
+        if not k:
+            k = self.k
+
+        if not sigma:
+            sigma = self.sigma
+
+        tune_data = self.data_split['tune']
+        tune_x = tune_data.iloc[:, :-1]
+        tune_y = tune_data.iloc[:, -1]
+
+        train_x = train_data.iloc[:, :-1]
+        train_y = train_data.iloc[:, -1]
+
+        error = 0
+
+        for row_index, row in tune_x.iterrows():
+            distances = ((train_x - row) ** 2).sum(axis=1).sort_values()[:k]
+
+            neighbors = distances[:k]
+
+            kernel = neighbors.apply(lambda row_distance: math.exp((1 / (2 * sigma)) * row_distance))
+            neighbors_r = train_y.loc[neighbors.index.to_list()]
+
+            prediction = sum(kernel * neighbors_r) / sum(kernel)
+            actual = tune_y.loc[row_index]
+
+            error += (actual - prediction) ** 2
+
+        mse = error / len(tune_data)
+
+        return mse
+
     def predict(self, k=None, sigma=None):
         if not k:
             k = self.k
@@ -186,10 +252,10 @@ class KNNRegressor:
         if not sigma:
             sigma = self.sigma
 
-        test_results = {index: 0 for index in range(1, 6)}
+        test_results = {index: 0 for index in range(5)}
         test_classification = pd.DataFrame()
 
-        for index in range(1, 6):
+        for index in range(5):
             train_data = self.train_data[index]
             train_x = train_data.iloc[:, :-1]
             train_y = train_data.iloc[:, -1]

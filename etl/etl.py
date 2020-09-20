@@ -375,8 +375,8 @@ class ETL:
         # Determine the remaining index that weren't picked for tune
         remainder = list(set(self.transformed_data.index) - set(tune_splitter))
 
-        for index in range(1, 6):
-            if index <= extra_data:
+        for index in range(5):
+            if (index + 1) <= extra_data:
                 splitter = np.random.choice(a=remainder, size=(cv_size + 1), replace=False)
 
             else:
