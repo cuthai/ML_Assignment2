@@ -133,7 +133,10 @@ class KNNRegressor:
                     temp_train_data[epsilon].update({index: train_data})
 
                 else:
-                    self.condense(index)
+                    train_data, mse = self.condense(copy.deepcopy(self.train_data[index]), epsilon=epsilon)
+
+                    epsilon_mse += mse
+                    temp_train_data[epsilon].update({index: train_data})
 
             average_mse = epsilon_mse / 5
 
@@ -181,36 +184,53 @@ class KNNRegressor:
         train_data = train_data.loc[~train_data.index.isin(edit_out_list)]
 
         if len(edit_out_list) > 0:
-            train_data, mse = self.edit(train_data)
+            train_data, mse = self.edit(train_data, epsilon=epsilon)
         else:
             mse = self.tune_epsilon(train_data)
 
         return train_data, mse
 
-    def condense(self, index, z_data=None):
-        temp_train_data = self.train_data[index]
+    def condense(self, temp_train_data, k=None, sigma=None, epsilon=None, z_data=None):
+        if not k:
+            k = self.k
+
+        if not sigma:
+            sigma = self.sigma
+
+        if not epsilon:
+            epsilon = self.epsilon
 
         if z_data is None:
             z_data = pd.DataFrame(temp_train_data.iloc[0, :]).T
         z_data_x = z_data.iloc[:, :-1]
+        z_data_y = z_data.iloc[:, -1]
 
         condense_in_count = 0
 
         for row_index, row in temp_train_data.iterrows():
             distances = ((z_data_x - row) ** 2).sum(axis=1).sort_values()
 
-            neighbor = distances.index.to_list()[0]
-            classification = z_data.loc[neighbor, 'Class']
+            neighbors = distances[:k]
 
-            if classification != temp_train_data.loc[row_index, 'Class']:
+            kernel = neighbors.apply(lambda row_distance: math.exp((1 / (2 * sigma)) * row_distance))
+            neighbors_r = z_data_y.loc[neighbors.index.to_list()]
+
+            prediction = sum(kernel * neighbors_r) / sum(kernel)
+            actual = z_data_y.loc[row_index]
+
+            percent_different = abs((prediction - actual) / actual)
+
+            if percent_different > epsilon:
                 condense_in_count += 1
                 z_data = z_data.append(temp_train_data.loc[row_index])
                 z_data_x = z_data.iloc[:, :-1]
 
         if condense_in_count > 0:
-            self.condense(index, z_data)
+            train_data, mse = self.condense(temp_train_data, epsilon=epsilon, z_data=z_data)
         else:
-            self.train_data.update({index: z_data})
+            mse = self.tune_epsilon(z_data)
+
+        return z_data, mse
 
     def tune_epsilon(self, train_data, k=None, sigma=None):
         if not k:
