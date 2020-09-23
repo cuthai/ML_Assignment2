@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-import math
 import copy
 
 
@@ -31,11 +30,13 @@ class KNNRegressor:
 
     def tune(self, k_range=None, k=None, sigma_range=None, sigma=None):
         import datetime
-        print(datetime.datetime.now())
+        time = datetime.datetime.now()
         self.tune_k(k_range, sigma)
-        print(datetime.datetime.now())
+        print((datetime.datetime.now() - time).seconds)
+        time = datetime.datetime.now()
         self.tune_sigma(k, sigma_range)
-        print(datetime.datetime.now())
+        print((datetime.datetime.now() - time).seconds)
+        time = datetime.datetime.now()
 
     def tune_k(self, k_range=None, sigma=None):
         if not k_range:
@@ -61,7 +62,7 @@ class KNNRegressor:
                 for k in tune_results['k'].keys():
                     neighbors = distances[:k]
 
-                    kernel = neighbors.apply(lambda row_distance: math.exp((1 / (2 * sigma)) * row_distance))
+                    kernel = np.exp((1 / (2 * sigma)) * neighbors)
                     neighbors_r = train_y.loc[neighbors.index.to_list()]
 
                     prediction = sum(kernel * neighbors_r) / sum(kernel)
@@ -94,12 +95,12 @@ class KNNRegressor:
             train_y = train_data.iloc[:, -1]
 
             for row_index, row in tune_x.iterrows():
-                distances = ((train_x - row) ** 2).sum(axis=1).sort_values()[:k]
+                distances = ((train_x - row) ** 2).sum(axis=1).sort_values()
 
                 for sigma in tune_results['sigma'].keys():
                     neighbors = distances[:k]
 
-                    kernel = neighbors.apply(lambda row_distance: math.exp((1 / (2 * sigma)) * row_distance))
+                    kernel = np.exp((1 / (2 * sigma)) * neighbors)
                     neighbors_r = train_y.loc[neighbors.index.to_list()]
 
                     prediction = sum(kernel * neighbors_r) / sum(kernel)
@@ -114,18 +115,25 @@ class KNNRegressor:
         self.sigma = min(tune_results['sigma'], key=tune_results['sigma'].get)
 
     def fit_modified(self, epsilon_range=None):
-        if not epsilon_range:
-            epsilon_range = [.1, .05, .01]
+        import datetime
 
-        max_mse = 0
-        epsilon_mse = 0
+        if not epsilon_range:
+            epsilon_range = [.5, .25, .1, .05, .01]
+
+        min_mse = 1000000
         temp_train_data = {epsilon: {} for epsilon in epsilon_range}
-        max_train_data = None
+        min_train_data = None
 
         self.tune_results['epsilon'] = {}
 
+        time = datetime.datetime.now()
+
         for epsilon in epsilon_range:
+            epsilon_mse = 0
+
             for index in range(5):
+                print((datetime.datetime.now() - time).seconds)
+                time = datetime.datetime.now()
                 if self.knn_type == 'edited':
                     train_data, mse = self.edit(copy.deepcopy(self.train_data[index]), epsilon=epsilon)
 
@@ -140,16 +148,19 @@ class KNNRegressor:
 
             average_mse = epsilon_mse / 5
 
-            if average_mse > max_mse:
-                max_mse = average_mse
-                max_train_data = temp_train_data[epsilon]
+            if average_mse < min_mse:
+                min_mse = average_mse
+                min_train_data = temp_train_data[epsilon]
                 self.epsilon = epsilon
 
             self.tune_results['epsilon'].update({epsilon: average_mse})
 
-        self.train_data = max_train_data
+        self.train_data = min_train_data
 
     def edit(self, temp_train_data, k=None, sigma=None, epsilon=None):
+        if len(temp_train_data) <= 1:
+            return temp_train_data, self.tune_epsilon(temp_train_data)
+
         if not k:
             k = self.k
 
@@ -170,7 +181,7 @@ class KNNRegressor:
 
             neighbors = distances[:k]
 
-            kernel = neighbors.apply(lambda row_distance: math.exp((1 / (2 * sigma)) * row_distance))
+            kernel = np.exp((1 / (2 * sigma)) * neighbors)
             neighbors_r = train_y.loc[neighbors.index.to_list()]
 
             prediction = sum(kernel * neighbors_r) / sum(kernel)
@@ -183,6 +194,8 @@ class KNNRegressor:
 
         train_data = train_data.loc[~train_data.index.isin(edit_out_list)]
 
+        if len(train_data) == 0:
+            return train_data, 1000001
         if len(edit_out_list) > 0:
             train_data, mse = self.edit(train_data, epsilon=epsilon)
         else:
@@ -190,10 +203,7 @@ class KNNRegressor:
 
         return train_data, mse
 
-    def condense(self, temp_train_data, k=None, sigma=None, epsilon=None, z_data=None):
-        if not k:
-            k = self.k
-
+    def condense(self, temp_train_data, sigma=None, epsilon=None, z_data=None):
         if not sigma:
             sigma = self.sigma
 
@@ -207,16 +217,18 @@ class KNNRegressor:
 
         condense_in_count = 0
 
+        temp_train_data = temp_train_data.loc[~temp_train_data.index.isin(z_data.index)]
+
         for row_index, row in temp_train_data.iterrows():
             distances = ((z_data_x - row) ** 2).sum(axis=1).sort_values()
 
-            neighbors = distances[:k]
+            neighbors = distances[:1]
 
-            kernel = neighbors.apply(lambda row_distance: math.exp((1 / (2 * sigma)) * row_distance))
+            kernel = np.exp((1 / (2 * sigma)) * neighbors)
             neighbors_r = z_data_y.loc[neighbors.index.to_list()]
 
             prediction = sum(kernel * neighbors_r) / sum(kernel)
-            actual = z_data_y.loc[row_index]
+            actual = temp_train_data.loc[row_index][-1]
 
             percent_different = abs((prediction - actual) / actual)
 
@@ -224,9 +236,10 @@ class KNNRegressor:
                 condense_in_count += 1
                 z_data = z_data.append(temp_train_data.loc[row_index])
                 z_data_x = z_data.iloc[:, :-1]
+                z_data_y = z_data.iloc[:, -1]
 
         if condense_in_count > 0:
-            train_data, mse = self.condense(temp_train_data, epsilon=epsilon, z_data=z_data)
+            z_data, mse = self.condense(temp_train_data, epsilon=epsilon, z_data=z_data)
         else:
             mse = self.tune_epsilon(z_data)
 
@@ -253,7 +266,7 @@ class KNNRegressor:
 
             neighbors = distances[:k]
 
-            kernel = neighbors.apply(lambda row_distance: math.exp((1 / (2 * sigma)) * row_distance))
+            kernel = np.exp((1 / (2 * sigma)) * neighbors)
             neighbors_r = train_y.loc[neighbors.index.to_list()]
 
             prediction = sum(kernel * neighbors_r) / sum(kernel)
@@ -289,7 +302,7 @@ class KNNRegressor:
 
                 neighbors = distances[:k]
 
-                kernel = neighbors.apply(lambda row_distance: math.exp((1 / (2 * sigma)) * row_distance))
+                kernel = np.exp((1 / (2 * sigma)) * neighbors)
                 neighbors_r = train_y.loc[neighbors.index.to_list()]
 
                 prediction = sum(kernel * neighbors_r) / sum(kernel)
