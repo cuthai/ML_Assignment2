@@ -187,7 +187,10 @@ class KNNRegressor:
             prediction = sum(kernel * neighbors_r) / sum(kernel)
             actual = train_y.loc[row_index]
 
-            percent_different = abs((prediction - actual) / actual)
+            if actual == 0:
+                percent_different = 1
+            else:
+                percent_different = abs((prediction - actual) / actual)
 
             if percent_different > epsilon:
                 edit_out_list.append(row_index)
@@ -230,7 +233,13 @@ class KNNRegressor:
             prediction = sum(kernel * neighbors_r) / sum(kernel)
             actual = temp_train_data.loc[row_index][-1]
 
-            percent_different = abs((prediction - actual) / actual)
+            if actual == 0:
+                if prediction > 0:
+                    percent_different = 1
+                else:
+                    percent_different = 0
+            else:
+                percent_different = abs((prediction - actual) / actual)
 
             if percent_different > epsilon:
                 condense_in_count += 1
