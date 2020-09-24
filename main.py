@@ -35,6 +35,8 @@ def main():
 
     knn_model.predict()
 
+    knn_model.output()
+
     pass
 
 

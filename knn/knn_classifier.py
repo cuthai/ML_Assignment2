@@ -1,11 +1,19 @@
 import pandas as pd
+import json
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 class KNNClassifier:
     def __init__(self, etl, knn_type):
         self.etl = etl
+        self.data_name = self.etl.data_name
         self.data_split = etl.data_split
-        self.knn_type = knn_type
+
+        self.knn_type = 'regular'
+
+        if knn_type:
+            self.knn_type = knn_type
 
         self.train_data = {}
 
@@ -13,6 +21,9 @@ class KNNClassifier:
         self.k = 1
 
         self.test_results = {}
+
+        self.summary = {}
+        self.summary_classification = None
 
     def fit(self):
         for index in range(5):
@@ -60,16 +71,11 @@ class KNNClassifier:
         self.k = min(tune_results, key=tune_results.get)
 
     def fit_modified(self):
-        import datetime
-
         for index in range(5):
-            print(index)
-            print(datetime.datetime.today())
             if self.knn_type == 'edited':
                 self.edit(index)
             else:
                 self.condense(index)
-            print(datetime.datetime.today())
 
     def edit(self, index, k=None):
         if not k:
@@ -131,8 +137,12 @@ class KNNClassifier:
         if not k:
             k = self.k
 
-        test_results = {index: 0 for index in range(5)}
-        test_classification = pd.DataFrame()
+        test_results = {
+            index: {
+                'misclassification': 0,
+                'classification': []
+            } for index in range(5)
+        }
 
         for index in range(5):
             train_data = self.train_data[index]
@@ -154,8 +164,65 @@ class KNNClassifier:
                     classification = class_occurrence[0]
 
                 if classification != test_data.loc[row_index, 'Class']:
-                    test_results[index] += 1
+                    test_results[index]['misclassification'] += 1
 
-            test_results[index] = test_results[index] / len(test_data)
+                test_results[index]['classification'].append(classification)
+
+            test_results[index]['misclassification'] = test_results[index]['misclassification'] / len(test_data)
 
         self.test_results = test_results
+
+    def output(self):
+        self.visualize_tune()
+
+        misclassification = sum([self.test_results[index]['misclassification'] for index in range(5)])
+
+        self.summary = {
+            'tune': {
+                'k': self.k
+            },
+            'test': {
+                'misclassification': misclassification / 5
+            }
+        }
+
+        with open(f'output_{self.data_name}\\{self.data_name}_{self.knn_type}_summary.json', 'w') as file:
+            json.dump(self.summary, file)
+
+        summary_classification = pd.DataFrame()
+        for index in range(5):
+            temp_summary_classification = self.data_split[index]
+            temp_summary_classification['classification'] = self.test_results[index]['classification']
+            summary_classification = summary_classification.append(temp_summary_classification)
+
+        summary_classification.to_csv(f'output_{self.data_name}\\{self.data_name}_{self.knn_type}_classification.csv')
+        self.summary_classification = summary_classification
+
+    def visualize_tune(self):
+        """
+        Tune visualization function
+
+        This function uses the results of the tune function to create a plot graph
+
+        :return: matplotlib saved jpg in output folder
+        """
+        # Figure / axis set up
+        fig, ax = plt.subplots()
+
+        # We'll plot the list of params and their accuracy
+        ax.plot(self.tune_results.keys(), self.tune_results.values())
+
+        # Title
+        ax.set_title(rf'{self.data_name} Tune Results - Optimal: K {self.k}')
+
+        # X axis
+        ax.set_xlabel('K')
+        ax.set_xlim(3, 21)
+        ax.set_xticks(np.linspace(3, 21, 10))
+        ax.set_xticklabels(np.linspace(3, 21, 10), rotation=45, fontsize=6)
+
+        # Y axis
+        ax.set_ylabel('Misclassification')
+
+        # Saving
+        plt.savefig(f'output_{self.data_name}\\{self.data_name}_tune.jpg')
