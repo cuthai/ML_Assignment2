@@ -20,6 +20,12 @@ def args():
                         help='Specify a seed to pass to the data splitter')
     parser.add_argument('-kt', '--knn_type', type=str,
                         help='Specify type of KNN, ignore for the original KNN, otherwise pass <edited> or <condensed>')
+    parser.add_argument('-k', '--k', type=int,
+                        help='Specify K for prediction. Overrides tune')
+    parser.add_argument('-s', '--sigma', type=float,
+                        help='Specify K for prediction. Overrides tune')
+    parser.add_argument('-e', '--epsilon', type=float,
+                        help='Specify epsilon for prediction. Overrides tune')
 
     # Parse arguments
     command_args = parser.parse_args()

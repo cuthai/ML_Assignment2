@@ -31,11 +31,22 @@ def main():
     knn_model.tune()
 
     if arguments.knn_type in ['edited', 'condensed']:
-        knn_model.fit_modified()
+        if arguments.epsilon:
+            epsilon_range = list(arguments.epsilon)
+        else:
+            epsilon_range = None
+        knn_model.fit_modified(epsilon_range=epsilon_range)
 
+    if arguments.k:
+        knn_model.k = arguments.k
+    if arguments.sigma:
+        knn_model.sigma = arguments.sigma
     knn_model.predict()
 
     knn_model.output()
+
+    if arguments.k == arguments.sigma == arguments.epsilon is None:
+        knn_model.visualize_tune()
 
     pass
 

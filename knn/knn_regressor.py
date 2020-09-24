@@ -1,13 +1,20 @@
 import pandas as pd
 import numpy as np
 import copy
+import json
+import matplotlib.pyplot as plt
 
 
 class KNNRegressor:
     def __init__(self, etl, knn_type):
         self.etl = etl
+        self.data_name = self.etl.data_name
         self.data_split = etl.data_split
-        self.knn_type = knn_type
+
+        self.knn_type = 'regular'
+
+        if knn_type:
+            self.knn_type = knn_type
 
         self.train_data = {}
 
@@ -17,6 +24,9 @@ class KNNRegressor:
         self.epsilon = .05
 
         self.test_results = {}
+
+        self.summary = {}
+        self.summary_prediction = None
 
     def fit(self):
         for index in range(5):
@@ -29,14 +39,9 @@ class KNNRegressor:
             self.train_data.update({index: train_data})
 
     def tune(self, k_range=None, k=None, sigma_range=None, sigma=None):
-        import datetime
-        time = datetime.datetime.now()
         self.tune_k(k_range, sigma)
-        print((datetime.datetime.now() - time).seconds)
-        time = datetime.datetime.now()
+
         self.tune_sigma(k, sigma_range)
-        print((datetime.datetime.now() - time).seconds)
-        time = datetime.datetime.now()
 
     def tune_k(self, k_range=None, sigma=None):
         if not k_range:
@@ -115,8 +120,6 @@ class KNNRegressor:
         self.sigma = min(tune_results['sigma'], key=tune_results['sigma'].get)
 
     def fit_modified(self, epsilon_range=None):
-        import datetime
-
         if not epsilon_range:
             epsilon_range = [.5, .25, .1, .05, .01]
 
@@ -126,14 +129,10 @@ class KNNRegressor:
 
         self.tune_results['epsilon'] = {}
 
-        time = datetime.datetime.now()
-
         for epsilon in epsilon_range:
             epsilon_mse = 0
 
             for index in range(5):
-                print((datetime.datetime.now() - time).seconds)
-                time = datetime.datetime.now()
                 if self.knn_type == 'edited':
                     train_data, mse = self.edit(copy.deepcopy(self.train_data[index]), epsilon=epsilon)
 
@@ -294,8 +293,12 @@ class KNNRegressor:
         if not sigma:
             sigma = self.sigma
 
-        test_results = {index: 0 for index in range(5)}
-        test_classification = pd.DataFrame()
+        test_results = {
+            index: {
+                'mse': 0,
+                'prediction': []
+            } for index in range(5)
+        }
 
         for index in range(5):
             train_data = self.train_data[index]
@@ -317,8 +320,82 @@ class KNNRegressor:
                 prediction = sum(kernel * neighbors_r) / sum(kernel)
                 actual = test_y.loc[row_index]
 
-                test_results[index] += (actual - prediction) ** 2
+                test_results[index]['mse'] += (actual - prediction) ** 2
 
-            test_results[index] = test_results[index] / len(test_data)
+                test_results[index]['prediction'].append(prediction)
+
+            test_results[index]['mse'] = test_results[index]['mse'] / len(test_data)
 
         self.test_results = test_results
+
+    def output(self):
+        mse = sum([self.test_results[index]['mse'] for index in range(5)])
+
+        self.summary = {
+            'tune': {
+                'k': self.k,
+                'sigma': self.sigma
+            },
+            'test': {
+                'mse': mse / 5
+            }
+        }
+
+        if self.knn_type != 'regular':
+            self.summary['tune'].update({'epsilon': self.epsilon})
+
+        with open(f'output_{self.data_name}\\{self.data_name}_{self.knn_type}_summary.json', 'w') as file:
+            json.dump(self.summary, file)
+
+        summary_prediction = pd.DataFrame()
+        for index in range(5):
+            temp_summary_prediction = self.data_split[index]
+            temp_summary_prediction['prediction'] = self.test_results[index]['prediction']
+            summary_prediction = summary_prediction.append(temp_summary_prediction)
+
+        summary_prediction.to_csv(f'output_{self.data_name}\\{self.data_name}_{self.knn_type}_prediction.csv')
+        self.summary_prediction = summary_prediction
+
+    def visualize_tune(self):
+        """
+        Tune visualization function
+
+        This function uses the results of the tune function to create a plot graph
+
+        :return: matplotlib saved jpg in output folder
+        """
+        tune_list = ['k', 'sigma']
+
+        if self.knn_type != 'regular':
+            tune_list.append('epsilon')
+
+        for parameter in tune_list:
+            if parameter == 'k':
+                optimal = self.k
+            elif parameter == 'sigma':
+                optimal = self.sigma
+            else:
+                optimal = self.epsilon
+
+            # Figure / axis set up
+            fig, ax = plt.subplots()
+
+            # We'll plot the list of params and their accuracy
+            ax.plot(self.tune_results[parameter].keys(), self.tune_results[parameter].values())
+
+            # Title
+            ax.set_title(rf'{self.data_name} {parameter} Tune Results - Optimal: {parameter} {optimal}')
+
+            # X axis
+            ax.set_xlabel(parameter)
+            ax.set_xticks(list(self.tune_results[parameter].keys()))
+            ax.set_xticklabels(list(self.tune_results[parameter].keys()), rotation=45, fontsize=6)
+
+            # Y axis
+            ax.set_ylabel('MSE')
+
+            # Saving
+            if parameter == 'epsilon':
+                plt.savefig(f'output_{self.data_name}\\{self.data_name}_{self.knn_type}_{parameter}_tune.jpg')
+            else:
+                plt.savefig(f'output_{self.data_name}\\{self.data_name}_{parameter}_tune.jpg')
