@@ -32,7 +32,7 @@ def main():
 
     if arguments.knn_type in ['edited', 'condensed']:
         if arguments.epsilon:
-            epsilon_range = list(arguments.epsilon)
+            epsilon_range = [arguments.epsilon]
         else:
             epsilon_range = None
         knn_model.fit_modified(epsilon_range=epsilon_range)
@@ -47,8 +47,6 @@ def main():
 
     if arguments.k == arguments.sigma == arguments.epsilon is None:
         knn_model.visualize_tune()
-
-    pass
 
 
 if __name__ == '__main__':
