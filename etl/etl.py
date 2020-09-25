@@ -276,7 +276,8 @@ class ETL:
         normalized_temp_df = (temp_df - temp_df.mean()) / temp_df.std()
 
         # Add Binned variables for sex
-        normalized_temp_df = normalized_temp_df.join(pd.get_dummies(temp_df[['month', 'day']], columns=['month', 'day']))
+        normalized_temp_df = normalized_temp_df.join(pd.get_dummies(temp_df[['month', 'day']],
+                                                                    columns=['month', 'day']))
 
         # We'll remove the old binned variables and reorder our target
         normalized_temp_df.drop(columns=['month', 'day', 'area'], inplace=True)
