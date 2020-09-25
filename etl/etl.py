@@ -135,9 +135,7 @@ class ETL:
         """
         Function to transform glass data set
 
-        For this function numeric data is binned into groups of 10, and then dummied, similar to the breast-cancer
-            data set. There are no missing values. Since this is a multi class data set, we'll dummy the classes for now
-            and let the classifier handle the multi classes.
+        For this function all numeric data is normalized using mean/standard deviation
 
         :return self.transformed_data: DataFrame, transformed data set
         :return self.classes: int, num of classes
@@ -160,11 +158,9 @@ class ETL:
 
     def transform_segmentation(self):
         """
-        Function to transform vote data set
+        Function to transform segmentation data set
 
-        For this function a question mark is treated as a distinct category, since abstaining from a vote might tell us
-            about the rep's party. Since the data is somewhat categorical, there was no binning done. The data is
-            dummied based on the 3 possible values in each column.
+        For this function all numeric data is normalized using mean/standard deviation
 
         :return self.transformed_data: DataFrame, transformed data set
         :return self.classes: int, num of classes
@@ -191,8 +187,7 @@ class ETL:
         Function to transform vote data set
 
         For this function a question mark is treated as a distinct category, since abstaining from a vote might tell us
-            about the rep's party. Since the data is somewhat categorical, there was no binning done. The data is
-            dummied based on the 3 possible values in each column.
+            about the rep's party. The data is dummied based on the 3 possible values in each column.
 
         :return self.transformed_data: DataFrame, transformed data set
         :return self.classes: int, num of classes
@@ -220,11 +215,9 @@ class ETL:
 
     def transform_abalone(self):
         """
-        Function to transform vote data set
+        Function to transform abalone data set
 
-        For this function a question mark is treated as a distinct category, since abstaining from a vote might tell us
-            about the rep's party. Since the data is somewhat categorical, there was no binning done. The data is
-            dummied based on the 3 possible values in each column.
+        For this function all numeric data is normalized using mean/standard deviation
 
         :return self.transformed_data: DataFrame, transformed data set
         :return self.classes: int, num of classes
@@ -247,11 +240,9 @@ class ETL:
 
     def transform_machine(self):
         """
-        Function to transform vote data set
+        Function to transform machine data set
 
-        For this function a question mark is treated as a distinct category, since abstaining from a vote might tell us
-            about the rep's party. Since the data is somewhat categorical, there was no binning done. The data is
-            dummied based on the 3 possible values in each column.
+        For this function all numeric data is normalized using mean/standard deviation
 
         :return self.transformed_data: DataFrame, transformed data set
         :return self.classes: int, num of classes
@@ -271,11 +262,9 @@ class ETL:
 
     def transform_forest_fires(self):
         """
-        Function to transform vote data set
+        Function to transform forest-fires data set
 
-        For this function a question mark is treated as a distinct category, since abstaining from a vote might tell us
-            about the rep's party. Since the data is somewhat categorical, there was no binning done. The data is
-            dummied based on the 3 possible values in each column.
+        For this function all numeric data is normalized using mean/standard deviation
 
         :return self.transformed_data: DataFrame, transformed data set
         :return self.classes: int, num of classes
@@ -298,21 +287,18 @@ class ETL:
 
     def cv_split_classification(self):
         """
-        Function to split our transformed data into 10% tune, 60% train, 30% test
+        Function to split our transformed data into 10% tune and 5 cross validation splits for classification
 
-        This function randomizes a number and also the order of the 3 resulting data sets. This ensures that our fit
-            is on random ordering as well. The split DataFrames are then added back as a dictionary to the ETL object.
-            For the soybean data set, 10% tune would be only 4 data points so the tune and train are set to 70% vs 30%
-            test.
+        First this function randomizes a number between one and 10 to split out a tune set. After a number is randomized
+            and the data is sorted over the class and random number. The index of the data is then mod by 5 and each
+            remainder represents a set for cv splitting.
 
-        :return self.data_split: dict (of DataFrames), dictionary with keys (tune, train, test) referring to the split
-            transformed data
+        :return self.data_split: dict (of DataFrames), dictionary with keys (tune, 0, 1, 2, 3, 4) referring to the
+            split transformed data
         """
-        # Define base data size and size of tune and train
+        # Define base data size and size of tune
         data_size = len(self.transformed_data)
         tune_size = int(data_size / 10)
-        cv_size = int((data_size - tune_size) / 5)
-        extra_data = int((data_size - tune_size) % 5)
 
         # Check and set the random seed
         if self.random_state:
@@ -321,9 +307,9 @@ class ETL:
         # Sample for tune
         tune_splitter = []
 
+        # Randomize a number between 0 and 10 and multiply by the index to randomly pick observations over data set
         for index in range(tune_size):
             tune_splitter.append(np.random.choice(a=10) + (10 * index))
-
         self.data_split.update({
             'tune': self.transformed_data.iloc[tune_splitter]
         })
@@ -331,35 +317,39 @@ class ETL:
         # Determine the remaining index that weren't picked for tune
         remainder = list(set(self.transformed_data.index) - set(tune_splitter))
         remainder_df = pd.DataFrame(self.transformed_data.iloc[remainder]['Class'])
+
+        # Assign a random number
         remainder_df['Random_Number'] = np.random.randint(0, len(remainder), remainder_df.shape[0])
+
+        # Sort over class and the random number
         remainder_df.sort_values(by=['Class', 'Random_Number'], inplace=True)
         remainder_df.reset_index(inplace=True)
 
         # Sample for CV
         for index in range(5):
+            # Mod the index by 5 and there will be 5 remainder groups for the CV split
             splitter = remainder_df.loc[remainder_df.index % 5 == index]['index']
 
-            # Update our attribute with the dictionary defining the train, tune, and test data sets
+            # Update our attribute with the dictionary for this index
             self.data_split.update({
                 index: self.transformed_data.iloc[splitter]
             })
 
     def cv_split_regression(self):
         """
-        Function to split our transformed data into 10% tune, 60% train, 30% test
+        Function to split our transformed data into 10% tune and 5 cross validation splits for regression
 
-        This function randomizes a number and also the order of the 3 resulting data sets. This ensures that our fit
-            is on random ordering as well. The split DataFrames are then added back as a dictionary to the ETL object.
-            For the soybean data set, 10% tune would be only 4 data points so the tune and train are set to 70% vs 30%
-            test.
+        First this function splits out a tune set. The remainder is sampled 5 times to produce 5 cv splits.
 
-        :return self.data_split: dict (of DataFrames), dictionary with keys (tune, train, test) referring to the split
-            transformed data
+        :return self.data_split: dict (of DataFrames), dictionary with keys (tune, 0, 1, 2, 3, 4) referring to the
+            split transformed data
         """
-        # Define base data size and size of tune and train
+        # Define base data size and size of tune and splits
         data_size = len(self.transformed_data)
         tune_size = int(data_size / 10)
         cv_size = int((data_size - tune_size) / 5)
+
+        # The extra data will go to the first splits. The remainder of the length divided by 5 defines how many extra
         extra_data = int((data_size - tune_size) % 5)
 
         # Check and set the random seed
@@ -375,17 +365,21 @@ class ETL:
         # Determine the remaining index that weren't picked for tune
         remainder = list(set(self.transformed_data.index) - set(tune_splitter))
 
+        # CV Split
         for index in range(5):
+            # For whatever number of extra data, we'll add one to each of those index
             if (index + 1) <= extra_data:
+                # Sample for the CV size if extra data
                 splitter = np.random.choice(a=remainder, size=(cv_size + 1), replace=False)
 
             else:
-                # Generate a list of the size of our data and randomly pick 60% without replacement for train
+                # Sample for the CV size
                 splitter = np.random.choice(a=remainder, size=cv_size, replace=False)
 
+            # Define the remaining unsampled data points
             remainder = list(set(remainder) - set(splitter))
 
-            # Update our attribute with the dictionary defining the train, tune, and test data sets
+            # Update our attribute with the dictionary for this index
             self.data_split.update({
                 index: self.transformed_data.iloc[splitter]
             })
