@@ -5,11 +5,14 @@ def args():
     """
     Function to create command line arguments
 
-    There are two arguments:
+    Arguments:
         -dn <str> (data_name) name of the data to import form the data folder
             they are: breast-cancer, glass, iris, soybean, vote
         -rs <int> (random_seed) seed used for data split. Defaults to 1. All submitted output uses random_seed 1
-        -nb (naive_bayes) Switch to the Naive Bayes classifier. Defaults to Winnow2
+        -kt <str> (knn_type) Define one of the specialized KNN functions. Can be edited or condensed. Default to regular
+        -k <int> (k) K to replace tune function
+        -s <float> (sigma) Sigma to replace tune function
+        -e <float> (epsilon) Epsilon to replace tune function
     """
     # Initialize the parser
     parser = argparse.ArgumentParser()
