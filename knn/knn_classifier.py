@@ -121,7 +121,7 @@ class KNNClassifier:
         self.tune_results = tune_results
         self.k = min(tune_results, key=tune_results.get)
 
-    def fit_modified(self):
+    def fit_modified(self, epsilon_range=None):
         """
         Fit function for edited and condensed
 
@@ -190,7 +190,7 @@ class KNNClassifier:
         # Update the train_data with our edited dataset
         self.train_data.update({index: train_data})
 
-        # If there was an edit, recursive class to edit
+        # If there was an edit, recursive call to edit
         if len(edit_out_list) > 0:
             self.edit(index)
 
